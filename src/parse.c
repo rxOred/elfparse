@@ -1,6 +1,9 @@
 //remove these headers
 //
 //#include "parse.h"
+//
+//make this a full fucking elf parsing, code injection, binary patching library
+//
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,15 +23,32 @@ struct elf_header{    //elf_header
 struct phdr_table{    //phdrtab
 
   Elf64_Phdr *phdr_table;   /* program header table */
-  int phdr_entries;    /* no of program headers */
+  uint8_t phdr_entries;    /* no of program headers */
 };
 
+struct DIE{
+
+
+  Elf64_Addr addr;
+  char *function_name;
+};
+
+struct DBGINFO{
+
+  uint8_t debug_index;    /* index of debug section */
+  uint32_t debug_size;    /* size of debug section */
+  uint8_t debug_entries;    /* no of entries in debug section */
+  off_t debug_offset;    /* offset of debug section */
+  //we might need some additional structs to parse debug info and write a tree data structure
+  uint8_t *debug_content;    /* not yet parsed data of debug section */
+};
 struct STRTAB{    //for sections with type strtab 
 
-  int strtab_index;    /* index of section which holds section header name string table */
-  int strtab_size;    /* string table length */ 
-  int strtab_entries;     /* no of entries in string table, no of strings */
+  uint8_t strtab_index;    /* index of section which holds section header name string table */
+  uint32_t strtab_size;    /* string table length */ 
+  uint8_t strtab_entries;     /* no of entries in string table, no of strings */
   off_t strtab_offset;    /* string table offset from begining of the file */
+  char *strtab_buffer;
   char **strtab_content;   /* string table data */
 };
 
@@ -40,8 +60,9 @@ struct shdr_table{    //shdrtab
    * structures containing each usefull section information
    */
   struct STRTAB shstrtab;   /* string table structure */
+  struct DBGINFO dbginfo;
 
-  int shdr_entries;  /* no of section headers */
+  uint8_t shdr_entries;  /* no of section headers */
 };
 
 typedef struct {    //data
@@ -58,6 +79,9 @@ typedef struct {    //data
 
 } ElfData;
 
+#define STRING_NO
+#define PARSE
+
 void free_all(ElfData *data){
 
   /* 
@@ -65,19 +89,20 @@ void free_all(ElfData *data){
    * strtab_content contains char * pointing to heap where name of every 
    * section is stored 
    */
-  for(int i = 0; i < data->shdrtab.shstrtab.strtab_entries; i++){
-
-    free(data->shdrtab.shstrtab.strtab_content[i]);
-  }
+  if(data->shdrtab.shstrtab.strtab_buffer)
+    free(data->shdrtab.shstrtab.strtab_buffer);
 
   /* here we are cleaning char *, whcih are stored in heap */
-  free(data->shdrtab.shstrtab.strtab_content);
+  if(data->shdrtab.shstrtab.strtab_content)
+    free(data->shdrtab.shstrtab.strtab_content);
 
   /* here we are cleaning up shdr_table (type :Elf64_shdr *) which pointes to an array of Elf64_shdr structures */
-  free(data->shdrtab.shdr_table);
+  if(data->shdrtab.shdr_table)
+    free(data->shdrtab.shdr_table);
 
   /* here we are cleaning up phdr_table (type :Elf64_phdr *) which points to an array of Elf64_phdr structures */
-  free(data->phdrtab.phdr_table);
+  if(data->phdrtab.phdr_table)
+    free(data->phdrtab.phdr_table);
 }
 
 void exit_code(char *msg, int code){
@@ -86,26 +111,81 @@ void exit_code(char *msg, int code){
   exit(code);
 }
 
-char *extrace_info(int index){
+int get_section_index(struct shdr_table *shdr, char *section_name){
 
-  // extract debug into from section and return it to caller;
-  return NULL;
-}
+  int i;
+  for (i = 0; i < shdr->shstrtab.strtab_entries; i++){
 
-int get_section_index(struct shdr_table *shdrtab, char *section_name){
+    if(shdr->shdr_table[i].sh_name < shdr->shstrtab.strtab_size){
+    
+      char *buf = &shdr->shstrtab.strtab_buffer[shdr->shdr_table[i].sh_name];
+      if((buf != NULL))
 
-  for(int i = 0; i < shdrtab->shstrtab.strtab_entries; i++){
-
-    if(!strcmp(shdrtab->shstrtab.strtab_content[i], section_name))
-      return i;
+        if(strcmp(buf, section_name) == 0){
+        
+          printf("%s\n", buf);
+          return i;
+      }
+    }
   }
   return -1;
 }
 
-char **parse_strings(char *buffer, int entries, int size){
+void parse_dwarf_info(struct shdr_table *shdr, FILE *fh){
+
+  /* 
+   * we use get section index function to get section header index of debug_info section
+   * this function can be used for any section header
+   */
+  int index = get_section_index(shdr, ".symtab");
+
+  shdr->dbginfo.debug_index = index;
+  
+  /* 
+   * we then use that index value to access section header table values. 
+   * we assign debug offset to sh_offset of .debug_info section header structure
+   */
+  shdr->dbginfo.debug_offset = shdr->shdr_table[index].sh_offset;
+
+  /*
+   * we seek to that location of our binary file
+   */
+  fseek(fh, shdr->dbginfo.debug_offset, SEEK_SET);
+
+  /*
+   * we use same index to get size of the section so that we can read it to our buffer
+   */
+  shdr->dbginfo.debug_size = shdr->shdr_table[index].sh_size;
+
+  printf("%d\n", shdr->dbginfo.debug_size);
+
+  /* 
+   * we use previous retrieved size to allocate chunk of memory in head so we can read section contents to it
+   */
+  shdr->dbginfo.debug_content = calloc(sizeof(uint8_t), shdr->dbginfo.debug_size);
+  if(!shdr->dbginfo.debug_content) exit_code("calloc failed", EXIT_FAILURE);
+
+  if(fread(shdr->dbginfo.debug_content, 1, shdr->dbginfo.debug_size, fh) < shdr->dbginfo.debug_size)
+    exit_code("fread failed", EXIT_FAILURE);
+
+  for (int i = 0; i < (int) shdr->dbginfo.debug_size; i++)
+    printf("%c",shdr->dbginfo.debug_content[i]);
+  
+  putchar('\n');
+}
+
+char **parse_strings(struct shdr_table *shdr, int entries){
 
   char **parsed_string = calloc(sizeof(char *), entries);
   if(!parsed_string) return NULL;
+  
+  for (int i = 0; i < shdr->shstrtab.strtab_entries; i++){
+
+    char *buf = &shdr->shstrtab.strtab_buffer[shdr->shdr_table[i].sh_name];
+    parsed_string[i] = buf;
+  }
+
+#ifndef PARSE
 
   int entry_i = 0;
   for (int i = 0; i < size; ++i){
@@ -119,20 +199,8 @@ char **parse_strings(char *buffer, int entries, int size){
     else
       while(buffer[i] == '\0') i++;
   }
+#endif
   return parsed_string;
-}
-
-int get_no_of_strings(char *buffer, int size){
-
-  int strings = 0;
-  for (int i = 1; i < size; i++){
-
-    if(buffer[i] == '\0')
-      ++strings;
-    else 
-      continue;
-  }
-  return strings;
 }
 
 void print_section_names(ElfData *data){
@@ -150,27 +218,33 @@ void print_section_names(ElfData *data){
   data->shdrtab.shstrtab.strtab_size = data->shdrtab.shdr_table[data->shdrtab.shstrtab.strtab_index].sh_size;
 
   /* allocate a buffer with size sh_size, then read shstrtab into that buffer */
-  char *buffer = malloc(data->shdrtab.shstrtab.strtab_size);
-  if(!buffer) exit_code("malloc failed", EXIT_FAILURE);
+  data->shdrtab.shstrtab.strtab_buffer = malloc(data->shdrtab.shstrtab.strtab_size);
+  if(!data->shdrtab.shstrtab.strtab_buffer) exit_code("malloc failed", EXIT_FAILURE);
   
-  if(fread(buffer, 1, data->shdrtab.shstrtab.strtab_size, data->fh) < (unsigned long)data->shdrtab.shstrtab.strtab_size) 
+  if(fread(data->shdrtab.shstrtab.strtab_buffer, 1, data->shdrtab.shstrtab.strtab_size, data->fh) < (unsigned long)data->shdrtab.shstrtab.strtab_size) 
     exit_code("fread failed", EXIT_FAILURE);
- 
+
   /* 
    * after reading, we need tp get the exact number of strings in that table. this is also possible using something like 
    * e_shnum, which gives us number of sections. number of sections == no of strings in shstrtab
    */
-  data->shdrtab.shstrtab.strtab_entries = get_no_of_strings(buffer, data->shdrtab.shstrtab.strtab_size); 
+
+#ifdef STRING_NO
+  data->shdrtab.shstrtab.strtab_entries = data->shdrtab.shdr_entries;
+#else
+  data->shdrtab.shstrtab.strtab_entries = get_no_of_strings(data->shdrtab.shstrtab.strtab_buffer, data->shdrtab.shstrtab.strtab_size); 
+#endif
 
   printf("%d\t%d\n", data->shdrtab.shstrtab.strtab_size, data->shdrtab.shstrtab.strtab_entries);
 
   /* read to (char *) buffer , sh_size of bytes from current position (section .strtab offset)) */
-  data->shdrtab.shstrtab.strtab_content = parse_strings(buffer, data->shdrtab.shstrtab.strtab_entries, data->shdrtab.shstrtab.strtab_size);
+  data->shdrtab.shstrtab.strtab_content = parse_strings(&data->shdrtab, data->shdrtab.shstrtab.strtab_entries); 
 
   for (int i = 0; i < data->shdrtab.shstrtab.strtab_entries; i++){
 
     printf("%d %s\n", i, data->shdrtab.shstrtab.strtab_content[i]);
   }
+
 }
 
 bool check_elf(FILE *fh){
@@ -210,6 +284,7 @@ void assign_headers(ElfData *data){
   /* assigning shdr with data read from binary using ehdr->e_shoff */
   data->shdrtab.shdr_entries = data->elf_header.ehdr.e_shnum;
 
+  printf("total entries %d\n", data->shdrtab.shdr_entries);
   data->shdrtab.shdr_table = calloc(data->shdrtab.shdr_entries, sizeof(Elf64_Shdr));
   if(!data->shdrtab.shdr_table) exit_code("calloc failed", EXIT_FAILURE);
 
@@ -217,7 +292,6 @@ void assign_headers(ElfData *data){
 
   if(fread(data->shdrtab.shdr_table, sizeof(Elf64_Shdr), data->shdrtab.shdr_entries, data->fh) < (unsigned long)data->shdrtab.shdr_entries)
     exit_code("could not read section header table", EXIT_FAILURE);
-
 }
 
 FILE *open_file(char *filename){
@@ -239,10 +313,8 @@ int main(void){
   assign_headers(&data);
 
   print_section_names(&data);
-  int index = get_section_index(&data.shdrtab, ".debug_info");
-
-  char *debug_info = extrace_info(index);
+  parse_dwarf_info(&data.shdrtab, data.fh);
 
   free_all(&data);
-  exit_code(NULL, EXIT_SUCCESS);
+  return 0;
 }
