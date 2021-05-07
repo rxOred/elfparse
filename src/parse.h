@@ -19,7 +19,7 @@ struct elf_header{    //elf_header
 struct phdr_table{    //phdrtab
 
   Elf64_Phdr *phdr_table;   /* program header table */
-  uint8_t no_of_entries;    /* no of program headers */
+  uint8_t phdr_entries;    /* no of program headers */
 };
 struct DIE{
 
@@ -28,11 +28,23 @@ struct DIE{
   char *function_name;
 };
 
+struct SYMTAB{
+
+  uint8_t symtab_index;    /* index of symtab section */
+  uint32_t symtab_size;    /* size of symtab section */
+  uint8_t symtab_entries;
+  off_t symtab_offset;
+  Elf64_Sym *symtab;    /* dynamic symbol table , an array of Elf64_Sym structures*/
+  struct STRTAB *strtab;    /* pointer to symbol tables string table */
+};
+
 struct DBGINFO{
 
   uint8_t debug_index;    /* index of debug section */
   uint32_t debug_size;    /* size of debug section */
-  uint8_t debug_entries;    /* no of entries in debug section */
+
+  //  uint8_t debug_entries;    /* no of entries in debug section */
+
   off_t debug_offset;    /* offset of debug section */
   //we might need some additional structs to parse debug info and write a tree data structure
   char *debug_content;    /* not yet parsed data of debug section */
@@ -57,8 +69,13 @@ struct shdr_table{    //shdrtab
   /*
    * structures containing each usefull section information
    */
-  struct STRTAB shstrtab;   /* string table structure */
-  struct DBGINFO dbginfo;
+  struct STRTAB shstrtab;   /* section header table string table */
+  struct STRTAB dynstr;    /* dynamic section string table */
+  struct STRTAB strtab;
+  struct DBGINFO dbginfo;    
+  struct SYMTAB dynsym;    /* dynamic symbol table */
+
+  // we dont need a pointer to section header's string table because its already a member
 
   uint8_t shdr_entries;  /* no of section headers with that null section*/
 };
@@ -77,12 +94,18 @@ typedef struct {    //data
 
 } ElfData;
 
+//write some defines to indicate errors. then return that value instead of exit function.
+
+#define NOT_FOUND   404
+#define NOT_ELF     405
+
+
 #define STRING_NO
 #define PARSE
 
 FILE *open_file(char *filename);
 void assign_headers(ElfData *data);
 bool check_elf(FILE *fh);
-void exit_code(char *msg);
+
 
 #endif
