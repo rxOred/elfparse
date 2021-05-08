@@ -1,4 +1,4 @@
-
+#include "parse.h"
 /*
  * string table
  */
@@ -14,7 +14,7 @@ int parse_string_table(struct shdr_table *shdr, struct STRTAB *strtab, FILE *fh,
 
   fseek(fh, strtab->strtab_offset, SEEK_SET);
 
-  strtab->strtab_buffer = calloc(sizeof(char), strtab->strtab_size);
+  strtab->strtab_buffer = calloc(strtab->strtab_size, sizeof(char));
   if(!strtab->strtab_buffer){
 
     perror("parser: calloc failed");
@@ -64,4 +64,3 @@ int parse_strtab(struct shdr_table *shdr, FILE *fh){
    */
   shdr->symtab.strtab = &shdr->strtab;
 }
-

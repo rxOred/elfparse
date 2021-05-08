@@ -1,104 +1,4 @@
-//remove these headers
-//
-//#include "parse.h"
-//
-//make this a full fucking elf parsing, code injection, binary patching library
-//
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <elf.h>
-#include <stdbool.h>
-
-#include <sys/types.h>
-
-struct elf_header{    //elf_header
-
-  Elf64_Ehdr ehdr;    /* elf header */
-  ssize_t ehdr_size;    /* size of the elf header */
-};
-
-struct phdr_table{    //phdrtab
-
-  Elf64_Phdr *phdr_table;   /* program header table */
-  uint8_t phdr_entries;    /* no of program headers */
-};
-struct DIE{
-
-
-  Elf64_Addr addr;
-  char *function_name;
-};
-
-struct SYMTAB{
-
-  uint8_t symtab_index;
-  uint32_t symtab_size;
-  uint8_t symtab_entries;
-  off_t symtab_offset;
-  Elf64_Sym *symtab;    /* dynamic symbol table */
-  struct STRTAB *strtab;    /* pointer to symbol tables string table */
-};
-
-struct DBGINFO{
-
-  uint8_t debug_index;    /* index of debug section */
-  uint32_t debug_size;    /* size of debug section */
-  off_t debug_offset;    /* offset of debug section */
-  //we might need some additional structs to parse debug info and write a tree data structure
-  char *debug_content;    /* not yet parsed data of debug section */
-};
-
-struct STRTAB{    //for sections with type strtab 
-
-  uint8_t strtab_index;    /* index of section which holds section header name string table */
-  uint32_t strtab_size;    /* string table length */ 
-  uint8_t strtab_entries;     /* no of entries in string table, no of section names, or no of 
-                               * section names except null section. this is same as shdr_entries - 1
-                               */
-  off_t strtab_offset;    /* string table offset from begining of the file */
-  char *strtab_buffer;
-  char **strtab_content;   /* string table data */
-};
-
-struct shdr_table{    //shdrtab
-
-  Elf64_Shdr *shdr_table;   /* section header table */
- 
-  /*
-   * structures containing each usefull section information
-   */
-  struct STRTAB shstrtab;   /* string table structure */
-  struct STRTAB dynstr;
-  struct DBGINFO dbginfo;
-  struct SYMTAB dynsym;
-
-  uint8_t shdr_entries;  /* no of section headers with that null section*/
-};
-
-typedef struct {    //data
-
-  char *filename;   /* filename of the elf binary */
-  FILE *fh;   /* file structure to keep read data */
-
-  /*
-   * elf header / header table structures
-   */
-  struct elf_header elf_header;
-  struct phdr_table phdrtab;
-  struct shdr_table shdrtab;
-
-} ElfData;
-
-#define STRING_NO
-
-
-#define NOT_FOUND   404
-#define NOT_ELF     405
-#define NOT_EXEC    406
-#define NOT_REL     407
+#include "parse.h"
 
 void free_all(ElfData *data){
 
@@ -127,6 +27,12 @@ void free_all(ElfData *data){
 
 }
 
+int get_no_of_strings(char *buffer, int size){
+
+  
+
+}
+
 int get_section_index(struct shdr_table *shdr, char *section_name){
 
   int i;
@@ -145,121 +51,6 @@ int get_section_index(struct shdr_table *shdr, char *section_name){
   return NOT_FOUND;
 }
 
-/*
- * parses dwarf info section and stores information is struct DEBUGINFO dbginfo structure.
- * members of this struct can be used to parse a dwarf tree in future
- */
-int parse_dwarf_info(struct shdr_table *shdr, FILE *fh){
-
-  /* 
-   * we use get section index function to get section header index of debug_info section
-   * this function can be used for any section header
-   */
-  int index = get_section_index(shdr, ".debug_info");
-  if(index == NOT_FOUND) return NOT_FOUND;
-
-  shdr->dbginfo.debug_index = index;
-  
-  /* 
-   * we then use that index value to access section header table values. 
-   * we assign debug offset to sh_offset of .debug_info section header structure
-   */
-  shdr->dbginfo.debug_offset = shdr->shdr_table[index].sh_offset;
-
-  /*
-   * we seek to that location of our binary file
-   */
-  fseek(fh, shdr->dbginfo.debug_offset, SEEK_SET);
-
-  /*
-   * we use same index to get size of the section so that we can read it to our buffer
-   */
-  shdr->dbginfo.debug_size = shdr->shdr_table[index].sh_size;
-
-  /* 
-   * we use previous retrieved size to allocate chunk of memory in head so we can read section contents to it
-   */
-  shdr->dbginfo.debug_content = calloc(sizeof(uint8_t), shdr->dbginfo.debug_size);
-  if(!shdr->dbginfo.debug_content){
-
-    perror("parser : calloc failed");
-    return -1;
-  }
-
-  if(fread(shdr->dbginfo.debug_content, 1, shdr->dbginfo.debug_size, fh) < shdr->dbginfo.debug_size){
-
-    perror("parser fread failed");
-    return -1;
-  }
-
-  /*for (int i = 0; i < (int) shdr->dbginfo.debug_size; i++)
-    printf("%c",shdr->dbginfo.debug_content[i]);
-  
-  putchar('\n');*/
-  return 0;
-}
-
-/*
- * string table
- */
-int parse_strtab(struct shdr_table *shdr, struct STRTAB *strtab, FILE *fh, char *section_name){
-
-  strtab->strtab_index = get_section_index(shdr, section_name);
-  if(strtab->strtab_index == (uint8_t)NOT_FOUND) return NOT_FOUND;
-
-  strtab->strtab_entries = (uint8_t) UN; //temp
-  
-  strtab->strtab_offset = shdr->shdr_table[strtab->strtab_index].sh_offset;
-  strtab->strtab_size = shdr->shdr_table[strtab->strtab_index].sh_offset;
-
-  fseek(fh, strtab->strtab_offset, SEEK_SET);
-
-  strtab->strtab_buffer = calloc(sizeof(char), strtab->strtab_size);
-  if(!strtab->strtab_buffer){
-
-    perror("parser: calloc failed");
-    return -1;
-  }
-  if(fread(strtab->strtab_buffer, sizeof(char), strtab->strtab_size, fh) < strtab->strtab_size){
-
-    perror("parser fread failed");
-    return -1;
-  }
-
-  return 0;
-}
-
-int parse_dynstr(struct shdr_table *shdr, FILE *fh){
-
-  int ret = parse_strtab(shdr, &shdr->dynstr, fh, ".dynsym");
-  if(ret == NOT_FOUND){
-
-    puts("section .dynsym not found");
-    return -1;
-  }else if(ret == -1) return -1;
-
-  return 0;
-}
-/*
- * assigns dyanamic symbol table
- */
-int parse_dynsym(struct shdr_table *shdr, FILE *fh){
-
-  shdr->dynsym.symtab_index = get_section_index(shdr, ".dynsym");
-  if(shdr->dynsym.symtab_index == (uint8_t)NOT_FOUND) return NOT_FOUND; 
-
-  shdr->dynsym.symtab_entries = shdr->shdr_table[shdr->dynsym.symtab_index].sh_entsize;
-  shdr->dynsym.symtab_size = shdr->shdr_table[shdr->dynsym.symtab_index].sh_size;
-  shdr->dynsym.symtab_offset = shdr->shdr_table[shdr->dynsym.symtab_index].sh_offset;
-  
-  fseek(fh, shdr->dynsym.symtab_offset, SEEK_SET);
-  if(fread(shdr->dynsym.symtab, 1, shdr->dynsym.symtab_size, fh) < shdr->dynsym.symtab_size){
-
-    perror("parser: ");
-    return -1;
-  }
-  return 0;
-}
 
 char **get_strings(struct shdr_table *shdr, int entries){
 

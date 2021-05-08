@@ -1,3 +1,5 @@
+#include "parse.h"
+
 int parse_symbol_table(struct shdr_table *shdr, struct SYMTAB *symtab, FILE *fh, const char *section_name){
 
   symtab->symtab_index = get_section_index(shdr, section_name);
@@ -7,9 +9,14 @@ int parse_symbol_table(struct shdr_table *shdr, struct SYMTAB *symtab, FILE *fh,
   symtab->symtab_size = shdr->shdr_table[symtab->symtab_index].sh_size;
   symtab->symtab_offset = shdr->shdr_table[symtab->symtab_index].sh_offset;
  
-  symtab->symtab = calloc()
+  symtab->symtab = calloc(symtab->symtab_entries, sizeof(Elf64_Sym));
+  if(!symtab->symtab){
 
-  fseek(fh, symtab.symtab_offset, SEEK_SET);
+    perror("calloc failed");
+    return -1;
+  }
+
+  fseek(fh, symtab->symtab_offset, SEEK_SET);
   if(fread(symtab->symtab, 1, symtab->symtab_size, fh) < symtab->symtab_size){
 
     perror("parser: ");
@@ -21,7 +28,7 @@ int parse_symbol_table(struct shdr_table *shdr, struct SYMTAB *symtab, FILE *fh,
 
 int parse_dynsym(struct shdr_table *shdr, FILE *fh){
 
-  int ret = parse_dynsym(shdr, &shdr->dynsym, fh, ".dynsym");
+  int ret = parse_symbol_table(shdr, &shdr->dynsym, fh, ".dynsym");
   if(ret == NOT_FOUND){
   
     puts("Section not found");
@@ -34,7 +41,7 @@ int parse_dynsym(struct shdr_table *shdr, FILE *fh){
 
 int parse_symtab(struct shdr_table *shdr, FILE *fh){
 
-  int ret = parse_dynsym(shdr, &shdr->symtab, fh, ".symtab");
+  int ret = parse_symbol_table(shdr, &shdr->symtab, fh, ".symtab");
   if(ret == NOT_FOUND){
 
     puts("section .symtab not found");

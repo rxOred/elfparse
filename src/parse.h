@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <elf.h>
+#include <stdbool.h>
 
 #include <sys/types.h>
 
@@ -21,6 +22,7 @@ struct phdr_table{    //phdrtab
   Elf64_Phdr *phdr_table;   /* program header table */
   uint8_t phdr_entries;    /* no of program headers */
 };
+
 struct DIE{
 
 
@@ -40,6 +42,7 @@ struct SYMTAB{
 
 struct DBGINFO{
 
+  bool is_exec;
   uint8_t debug_index;    /* index of debug section */
   uint32_t debug_size;    /* size of debug section */
 
@@ -71,9 +74,10 @@ struct shdr_table{    //shdrtab
    */
   struct STRTAB shstrtab;   /* section header table string table */
   struct STRTAB dynstr;    /* dynamic section string table */
-  struct STRTAB strtab;
-  struct DBGINFO dbginfo;    
+  struct STRTAB strtab;    /* string table */
+  struct DBGINFO dbginfo;   /* debug info */
   struct SYMTAB dynsym;    /* dynamic symbol table */
+  struct SYMTAB symtab;    /* symbol table */
 
   // we dont need a pointer to section header's string table because its already a member
 
@@ -103,9 +107,31 @@ typedef struct {    //data
 #define STRING_NO
 #define PARSE
 
+// intitial functions
 FILE *open_file(char *filename);
-void assign_headers(ElfData *data);
-bool check_elf(FILE *fh);
+int assign_headers(ElfData *data);
+int check_elf(FILE *fh);
+void free_all(ElfData *data);
+int check_elf_type(Elf64_Ehdr *ehdr);
 
+// get information functions
+char **get_strings(struct shdr_table *shdr, int entries);
+int get_section_index(struct shdr_table *shdr, char *section_name);
+
+// program header table functions
+
+// section header table functions
+int parse_shstrtab(ElfData *data);  /* this is also an intial  function. this function is necessary to parse other information */
+
+
+// string tables functions
+int parse_string_table(struct shdr_table *shdr, struct STRTAB *strtab, FILE *fh, char *section_name);
+int parse_dynstr(struct shdr_table *shdr, FILE *fh);
+int parse_strtab(struct shdr_table *shdr, FILE *fh);
+
+// symbol table functions
+int parse_symbol_table(struct shdr_table *shdr, struct SYMTAB *symtab, FILE *fh, const char *section_name);
+int parse_dynsym(struct shdr_table *shdr, FILE *fh);
+int parse_symtab(struct shdr_table *shdr, FILE *fh);
 
 #endif
