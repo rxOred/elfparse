@@ -1,0 +1,4 @@
+1. Implement functions to patch binaries using relocation entries
+2. Use a dyanmic array for each section
+3. parse debug information
+4. write fucntions to append those arrays
