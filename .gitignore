@@ -1,2 +1,5 @@
 *.o
 *.asm
+GRTAGS
+GTAGS
+GPATH
