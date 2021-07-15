@@ -1,0 +1,2 @@
+- I started this project to get a low level understanding of elf file format. 
+- This can be used as a small library, but i consider that as a bad idea :)
