@@ -50,6 +50,8 @@ int main(void){
   parse_dynamic(&data.shdrtab, &data.shdrtab.dynamic, data.fh);
   get_lib_list(&data.shdrtab, &data.shdrtab.dynamic);
 
+  
+
   free_all(&data);
   return 0;
 }

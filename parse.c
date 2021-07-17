@@ -1,5 +1,6 @@
 #include "parse.h"
 #include <stdio.h>
+#include <assert.h>
 
 void free_all(ElfData *data){
 
@@ -46,6 +47,7 @@ void free_all(ElfData *data){
 
 int get_no_of_strings(char *buffer, int size){
 
+  assert(buffer != NULL);
   int no_of_strings = 0;
   for(int i = 0; i < size; i++){
 
@@ -58,6 +60,9 @@ int get_no_of_strings(char *buffer, int size){
 }
 
 int get_section_index(struct shdr_table *shdr, const char *section_name){
+
+  assert(shdr != NULL);
+  assert(section_name != NULL);
 
   int i;
   for (i = 0; i < shdr->shstrtab.strtab_entries; i++){
@@ -77,6 +82,7 @@ int get_section_index(struct shdr_table *shdr, const char *section_name){
 
 char **get_strings(struct shdr_table *shdr, int entries){
 
+  assert(shdr != NULL);
   char **parsed_string = malloc(sizeof(char *) * entries);
   if(!parsed_string){
 
@@ -97,6 +103,8 @@ char **get_strings(struct shdr_table *shdr, int entries){
 
 uint32_t get_section_link(struct shdr_table *shdr, const char *sectionname){
 
+  assert(shdr != NULL);
+  assert(sectionname != NULL);
   int index = get_section_index(shdr, sectionname);
   if(index == NOT_FOUND) return NOT_FOUND;
 
@@ -105,6 +113,8 @@ uint32_t get_section_link(struct shdr_table *shdr, const char *sectionname){
 
 uint64_t get_section_address_align(struct shdr_table *shdr, const char *sectionname){
 
+  assert(shdr != NULL);
+  assert(sectionname != NULL);
   int index = get_section_index(shdr, sectionname);
   if(index == NOT_FOUND) return NOT_FOUND;
 
@@ -113,6 +123,8 @@ uint64_t get_section_address_align(struct shdr_table *shdr, const char *sectionn
 
 uint32_t get_section_index_to_shstr(struct shdr_table *shdr, const char *sectionname){
 
+  assert(shdr != NULL);
+  assert(sectionname != NULL);
   int index = get_section_index(shdr, sectionname);
   if(index == NOT_FOUND) return NOT_FOUND;
 
@@ -121,6 +133,8 @@ uint32_t get_section_index_to_shstr(struct shdr_table *shdr, const char *section
 
 uint32_t get_section_type(struct shdr_table *shdr, const char *sectionname){
 
+  assert(shdr != NULL);
+  assert(sectionname != NULL);
   int index = get_section_index(shdr, sectionname);
   if(index == NOT_FOUND) return NOT_FOUND;
 
@@ -129,6 +143,8 @@ uint32_t get_section_type(struct shdr_table *shdr, const char *sectionname){
 
 uint32_t get_section_info(struct shdr_table *shdr, const char *sectionname){
 
+  assert(shdr != NULL);
+  assert(sectionname != NULL);
   int index = get_section_index(shdr, sectionname);
   if(index == NOT_FOUND) return NOT_FOUND;
 
@@ -137,6 +153,8 @@ uint32_t get_section_info(struct shdr_table *shdr, const char *sectionname){
 
 uint64_t get_section_flags(struct shdr_table *shdr, const char *sectionname){
 
+  assert(shdr != NULL);
+  assert(sectionname != NULL);
   int index = get_section_index(shdr, sectionname);
   if(index == NOT_FOUND) return NOT_FOUND;
 
@@ -145,6 +163,8 @@ uint64_t get_section_flags(struct shdr_table *shdr, const char *sectionname){
 
 Elf64_Addr get_section_address(struct shdr_table *shdr, const char *sectionname){
 
+  assert(shdr != NULL);
+  assert(sectionname != NULL);
   int index = get_section_index(shdr, sectionname);
   if(index == NOT_FOUND) return NOT_FOUND;
 
@@ -153,6 +173,8 @@ Elf64_Addr get_section_address(struct shdr_table *shdr, const char *sectionname)
 
 off_t get_section_offset(struct shdr_table *shdr, const char *sectionname){
 
+  assert(shdr != NULL);
+  assert(sectionname != NULL);
   int index = get_section_index(shdr, sectionname);
   if(index == NOT_FOUND) return NOT_FOUND;
 
@@ -161,6 +183,8 @@ off_t get_section_offset(struct shdr_table *shdr, const char *sectionname){
 
 uint64_t get_section_entrysize(struct shdr_table *shdr, const char *sectionname){
 
+  assert(shdr != NULL);
+  assert(sectionname != NULL);
   int index = get_section_index(shdr, sectionname);
   if(index == NOT_FOUND) return NOT_FOUND;
 
@@ -169,6 +193,8 @@ uint64_t get_section_entrysize(struct shdr_table *shdr, const char *sectionname)
 
 uint64_t get_section_size(struct shdr_table *shdr, const char *sectionname){
 
+  assert(shdr != NULL);
+  assert(sectionname != NULL);
   int index = get_section_index(shdr, sectionname);
   if(index == NOT_FOUND) return NOT_FOUND;
 
@@ -182,6 +208,8 @@ uint64_t get_section_size(struct shdr_table *shdr, const char *sectionname){
 int parse_shstrtab(ElfData *data){ //should have used struct shdr_table *
 
   /*get the section header table index to get the string table. ehdr.e_shstrndx containts the index of shstrtab table*/
+  assert(data != NULL);
+
   data->shdrtab.shstrtab.strtab_index = data->elf_header.ehdr.e_shstrndx;
 
   /*use section header index to access access corresponding section;'s shdr structure and use sh_offset to get the offset of the string table */
@@ -227,6 +255,7 @@ int parse_shstrtab(ElfData *data){ //should have used struct shdr_table *
 
 int check_elf(FILE *fh){
 
+  assert(fh != NULL);
   uint8_t buf[5];
  
   fseek(fh, 0, SEEK_SET);
@@ -248,6 +277,7 @@ int check_elf(FILE *fh){
 
 void init_ptr(struct shdr_table *shdr){
 
+  assert(shdr != NULL);
   /* initialize all not-yet-used pointers to null */
   shdr->shstrtab.strtab_buffer = NULL;
   shdr->shstrtab.strtab_content = NULL;
@@ -283,6 +313,8 @@ void init_ptr(struct shdr_table *shdr){
  * this function reads from the elf file and assign ehdr header and shdr, phdr tables
  */
 int assign_headers(ElfData *data){
+
+  assert(data != NULL);
 
   if(check_elf(data->fh) == -1) return -1;;
   fseek(data->fh, 0, SEEK_SET);
@@ -351,6 +383,7 @@ int assign_headers(ElfData *data){
 
 FILE *open_file(const char *filename){
 
+  assert(filename != NULL);
   FILE *local = fopen(filename, "rb");
   if(!local){
 

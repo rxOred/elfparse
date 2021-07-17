@@ -1,8 +1,12 @@
 #include <stdlib.h>
 #include "parse.h"
+#include <assert.h>
 
 int parse_comment(struct shdr_table *shdr, struct COMMENT *comment, FILE *fh){
 
+  assert(shdr != NULL);
+  assert(comment != NULL);
+  assert(fh != NULL);
   comment->comment_index = get_section_index(shdr, ".comment");
   if(comment->comment_index < 0)
     return -1;

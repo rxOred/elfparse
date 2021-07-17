@@ -52,7 +52,7 @@ char **get_lib_search_path(struct shdr_table *shdr, struct DYNAMIC *dyn){
   int j = 0;
   for(int i = 0; i < dyn->dynamic_entries; i++){
 
-    if(dyn->dyn[i].d_tag == DT_RUNPATH){
+    if(dyn->dyn[i].d_tag == DT_RUNPATH){    // or DT_RPATH, but deprecated
 
       ++no_of_ent;
       buffer = realloc(buffer, sizeof(char *) * no_of_ent);

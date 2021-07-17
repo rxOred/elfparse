@@ -1,5 +1,6 @@
 #include "parse.h"
 #include <stdlib.h>
+#include <assert.h>
 
 void free_strtab(struct STRTAB *str){
 
@@ -14,6 +15,9 @@ void free_strtab(struct STRTAB *str){
  * string table
  */
 char **get_strtab_contents(struct SYMTAB *symtab, char *buffer, int entries){
+
+  assert(symtab != NULL);
+  assert(buffer != NULL);
 
   if(!buffer){
 
@@ -37,6 +41,11 @@ char **get_strtab_contents(struct SYMTAB *symtab, char *buffer, int entries){
 }
 
 int parse_string_table(struct shdr_table *shdr, struct STRTAB *strtab, FILE *fh, char *section_name){
+
+  assert(fh != NULL);
+  assert(shdr != NULL);
+  assert(strtab != NULL);
+  assert(section_name);
 
   strtab->strtab_index = get_section_index(shdr, section_name);
   if(strtab->strtab_index == (uint8_t)NOT_FOUND) return NOT_FOUND;
@@ -71,6 +80,8 @@ int parse_string_table(struct shdr_table *shdr, struct STRTAB *strtab, FILE *fh,
  */
 int parse_dynstr(struct shdr_table *shdr, FILE *fh){
 
+  assert(fh != NULL);
+  assert(shdr != NULL);
   if(!shdr->dynsym.strtab)
     shdr->dynsym.strtab = &shdr->dynstr;
 
@@ -96,6 +107,8 @@ int parse_dynstr(struct shdr_table *shdr, FILE *fh){
  */
 int parse_strtab(struct shdr_table *shdr, FILE *fh){
 
+  assert(fh != NULL);
+  assert(shdr != NULL);
   if(!shdr->symtab.strtab)
     shdr->symtab.strtab = &shdr->strtab;
 
